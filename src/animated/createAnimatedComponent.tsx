@@ -26,6 +26,8 @@ const createAnimatedComponent: CreateAnimatedComponent = <C extends ReactType>(
       const forceUpdate = useForceUpdate()
       const mounted = useRef(true)
       const propsAnimated: MutableRefObject<AnimatedProps | null> = useRef(null)
+
+      // 持有 Component 的 instance
       const node: MutableRefObject<C | null> = useRef(null)
       const attachProps = useCallback(props => {
         const oldPropsAnimated = propsAnimated.current
@@ -50,10 +52,13 @@ const createAnimatedComponent: CreateAnimatedComponent = <C extends ReactType>(
       useEffect(
         () => () => {
           mounted.current = false
+          // 组件卸载时，执行 detach() 方法
           propsAnimated.current && propsAnimated.current.detach()
         },
         []
       )
+
+      // web 上是直接返回的 Component 对应的 instance
       useImperativeHandle<C, any>(ref, () =>
         animatedApi(node as MutableRefObject<C>, mounted, forceUpdate)
       )
@@ -67,6 +72,7 @@ const createAnimatedComponent: CreateAnimatedComponent = <C extends ReactType>(
 
       // Functions cannot have refs, see:
       // See: https://github.com/react-spring/react-spring/issues/569
+      // 这里没有判断 Component 是否是一个 ForwardRef 的函数组件，因为 React 没有暴露如何判断它
       const refFn = isFunctionComponent(Component)
         ? undefined
         : (childRef: C) => (node.current = handleRef(childRef, ref))

@@ -84,12 +84,18 @@ function interpolate(
   }
   if (outputMin === outputMax) return outputMin
   if (inputMin === inputMax) return input <= inputMin ? outputMin : outputMax
+
+  // 算出 result 在 input 中的比例
   // Input Range
   if (inputMin === -Infinity) result = -result
   else if (inputMax === Infinity) result = result - inputMin
   else result = (result - inputMin) / (inputMax - inputMin)
+
+  // 这里的 easing 会导致公式复杂了吧，先不管
   // Easing
   result = easing(result)
+
+  // 按照 result 在 input 中的比例，计算 output 中的值
   // Output Range
   if (outputMin === -Infinity) result = -result
   else if (outputMax === Infinity) result = result + outputMin
@@ -98,6 +104,8 @@ function interpolate(
 }
 
 function findRange(input: number, inputRange: number[]) {
+  // 从左往右找到第一个 >= input 的 inputRange
+  // 能找到的最大值为 inputRange.length - 1
   for (var i = 1; i < inputRange.length - 1; ++i)
     if (inputRange[i] >= input) break
   return i - 1

@@ -157,6 +157,9 @@ const domElements: JSXElements[] = [
 type AnimatedWithDOMElements = CreateAnimatedComponent &
   { [Tag in JSXElements]: AnimatedComponent<Tag> }
 
+// extendedAnimated.a = animated("a")
+// 所有的 animated.*，如 animated.div 就是由 createAnimatedComponent 创建的。
+// 所有的标签都是 merge 到 createAnimatedComponent 函数上的。
 // Extend animated with all the available THREE elements
 const apply = merge(animated as AnimatedWithDOMElements, false)
 const extendedAnimated = apply(domElements)

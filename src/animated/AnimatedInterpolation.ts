@@ -8,6 +8,19 @@ type IpValue = string | number | (string | number)[]
 // a custom interpolation function.
 type Interpolator = (...input: IpValue[]) => IpValue
 
+/**
+ * 数组形式的 parent 是为了支持下面这种形式
+const {o, xyz, color} = useSpring({
+  from: {xyz: [0, 0, 0]},
+  xyz: [10, 20, 5],
+})
+
+<animated.div
+  style={{
+    transform: xyz.interpolate((x, y, z) => `translate3d(${x}px, ${y}px, ${z}px)`),
+  }}
+/>
+ */
 export default class AnimatedInterpolation extends AnimatedArray<Animated>
   implements SpringValue {
   calc: Interpolator

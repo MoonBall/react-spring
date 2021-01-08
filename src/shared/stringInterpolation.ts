@@ -38,6 +38,8 @@ const createStringInterpolator = (config: InterpolationConfig<string>) => {
     .map(rangeValue => rangeValue.replace(colorRegex, colorToRgba))
     .map(rangeValue => rangeValue.replace(colorNamesRegex, colorToRgba))
 
+  // 将每个位置的数字都提取出来
+  // outputRanges[0] 是一个数组，表示第一个位置的数字的变化
   const outputRanges: number[][] = outputRange[0]
     .match(stringShapeRegex)!
     .map(() => [])

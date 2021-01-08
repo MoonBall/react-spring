@@ -13,7 +13,7 @@
     "docz:build": "docz build && cp .docz/dist/index.html .docz/dist/200.html && cp examples/CNAME .docz/dist/CNAME",
     "build": "npm-run-all --parallel copy rollup",
     "copy": "copyfiles -f package.json readme.md LICENSE.md \"types/*\" dist && json -I -f dist/package.json -e \"this.private=false; this.devDependencies=undefined; this.optionalDependencies=undefined; this.scripts=undefined; this.husky=undefined; this.prettier=undefined; this.jest=undefined;\"",
-    "rollup": "rollup -c",
+    "rollup": "rollup -c -m inline",
     "prepare": "npm run build",
     "test": "jest",
     "test:dev": "jest --watch --no-coverage",

@@ -23,6 +23,10 @@ type InterpolationsFor<P> = {
 }
 
 let G = 0
+/**
+ * controller 用于生成动画值
+ * 可以修改动画值（然后将值进行合并）、暂停/开启动画
+ */
 class Controller<P extends any = {}> {
   id: number
 
@@ -36,7 +40,14 @@ class Controller<P extends any = {}> {
   interpolations = {} as InterpolationsFor<P>
   values = {} as ValuesFor<P>
   configs: any = []
+
+  // 在 start() 时添加新的回调
+  // 在 stop() 是执行回调并清空
+  // 初始的回调的目的是：
+  //    在 queue 中任务执行完时，重置 this.idle 并执行 this.props.onRest()
   listeners: FinishedCallback[] = []
+
+  // { to, ...config } 这里的 to 的类型为：arr/fn/object
   queue: any[] = []
   localQueue?: any[]
 
@@ -61,6 +72,7 @@ class Controller<P extends any = {}> {
       let ops: any = {}
       Object.entries(to).forEach(([k, v]) => {
         // Fetch delay and create an entry, consisting of the to-props, the delay, and basic props
+        // 将其和上面的异步保持一致
         const entry = { to: { [k]: v }, delay: callProp(delay, k), ...props }
         const previous = ops[entry.delay] && ops[entry.delay].to
         ops[entry.delay] = {
@@ -79,6 +91,9 @@ class Controller<P extends any = {}> {
     return this
   }
 
+  /**
+   * 执行了 this.update() 后，会将后续的目标值放到 queue 中，如果不执行 start()，这些 queue 中的值不会生效
+   */
   /** start(onEnd)
    *  This function either executes a queue, if present, or starts the frameloop, which animates */
   start(onEnd?: FinishedCallback) {
@@ -86,6 +101,11 @@ class Controller<P extends any = {}> {
     if (this.queue.length) {
       this.idle = false
 
+      // this.localQueue 没有清空过。
+      // 如果上一次的 queue 执行完了，那么这里多执行一次 merge 没问题
+      // 如果上次 queue 没执行完，那么直接将前面 queue 的值都合并掉
+      // { ...form1, ...form0, ...this.merged, ...to0, ...to1 } 挺奇怪的。不重要吧
+      // 这里也没有处理 to 是数组和函数的情形
       // Updates can interrupt trailing queues, in that case we just merge values
       if (this.localQueue) {
         this.localQueue.forEach(({ from = {}, to = {} }) => {
@@ -114,6 +134,8 @@ class Controller<P extends any = {}> {
         let async = is.arr(props.to) || is.fun(props.to)
         if (delay) {
           setTimeout(() => {
+            // 最后一次执行 start() 进来的，才能继续执行回调
+            // 如果 setTimeout 后又启动了一次 start，那么不会继续执行
             if (local === this.guid) {
               if (async) this.runAsync(props, cb)
               else this.diff(props).start(cb)
@@ -126,6 +148,7 @@ class Controller<P extends any = {}> {
     // Otherwise we kick of the frameloop
     else {
       if (is.fun(onEnd)) this.listeners.push(onEnd)
+      // onStart 会被执行多次，因为可能多次调用 start()
       if (this.props.onStart) this.props.onStart()
       start(this)
     }
@@ -149,6 +172,9 @@ class Controller<P extends any = {}> {
     const local = this.local
     // If "to" is either a function or an array it will be processed async, therefor "to" should be empty right now
     // If the view relies on certain values "from" has to be present
+
+    // 生成的新 props 不支持数组和函数，也不支持 delay
+    // 所以下面是直接进行 diff().start() 而不是 update().start()
     let queue = Promise.resolve(undefined)
     if (is.arr(props.to)) {
       for (let i = 0; i < props.to.length; i++) {
@@ -166,6 +192,14 @@ class Controller<P extends any = {}> {
     } else if (is.fun(props.to)) {
       let index = 0
       let last: Promise<any>
+      // 这里的 to 的调用方式是这样的
+      // const props = useSpring({
+      //   to: async (next, cancel) => {
+      //     await next({opacity: 1, color: '#ffaaee'})
+      //     await next({opacity: 0, color: 'rgb(14,26,19)'})
+      //   },
+      //   from: {opacity: 0, color: 'red'}
+      // })
       queue = queue.then(() =>
         props
           .to(
@@ -173,7 +207,6 @@ class Controller<P extends any = {}> {
             (p: P) => {
               const fresh = { ...props, ...interpolateTo(p) }
               if (is.arr(fresh.config)) fresh.config = fresh.config[index]
-              index++
               //this.stop()
               if (local === this.guid)
                 return (last = new Promise(r => this.diff(fresh).start(r)))
@@ -209,11 +242,16 @@ class Controller<P extends any = {}> {
     this.merged = { ...from, ...this.merged, ...to }
 
     this.hasChanged = false
+
+    // target 是一个 Controller，在 useTrail 中是上一个 Controller
     // Attachment handling, trailed springs can "attach" themselves to a previous spring
     let target = attach && attach(this)
     // Reduces input { name: value } pairs into animated values
     this.animations = Object.entries<any>(this.merged).reduce(
       (acc, [name, value]) => {
+        // 这里的关键是看 interpolation 是如何计算的
+        // 注意：controller 是由 useSprings 生成的，而不是由 animatedComponent 生成的
+
         // Issue cached entries, except on reset
         let entry = acc[name] || {}
 
@@ -227,9 +265,15 @@ class Controller<P extends any = {}> {
         const isArray = is.arr(value)
         const isInterpolation = !isNumber && !isArray && !isString
 
+        // perspective(600px) rotateX(0deg) 是 isInterpolation
+        // 因为 /\d/.test(value) 是 true
+
         let fromValue = !is.und(from[name]) ? from[name] : value
         let toValue = isNumber || isArray ? value : isString ? value : 1
         let toConfig = callProp(config, name)
+
+        // target.animations[name].parent 是一个 AnimatedValue
+        // 后面 toValues 会用到 toValue.getPayload()
         if (target) toValue = target.animations[name].parent
 
         let parent = entry.parent,
@@ -239,6 +283,8 @@ class Controller<P extends any = {}> {
 
         let newValue = value
         if (isInterpolation)
+          // 这里是创建了 interpolate，然后用 1 去调用
+          // 主要是标准化颜色
           newValue = interp({
             range: [0, 1],
             output: [value as string, value as string],
@@ -247,12 +293,16 @@ class Controller<P extends any = {}> {
 
         // Change detection flags
         const isFirst = is.und(parent)
+        // 不是第一个且动画还没有结束
         const isActive =
           !isFirst && entry.animatedValues.some((v: AnimatedValue) => !v.done)
+
         const currentValueDiffersFromGoal = !is.equ(newValue, currentValue)
         const hasNewGoal = !is.equ(newValue, entry.previous)
         const hasNewConfig = !is.equ(toConfig, entry.config)
 
+        // TODO: Config 改变也会触发新的动画，config 改变时可能是 update() 触发的
+        // 而不是 start() 触发的
         // Change animation props when props indicate a new goal (new value differs from previous one)
         // and current values differ from it. Config changes trigger a new update as well (though probably shouldn't?)
         if (
@@ -268,6 +318,8 @@ class Controller<P extends any = {}> {
             parent = interpolation =
               entry.parent || new AnimatedValueArray(fromValue)
           else if (isInterpolation) {
+            // prev 可以是 parent 的当前值
+            // entry.interpolation.calc(entry.parent.value) 和 entry.interpolation.getValue() 是一样的
             let prev =
               entry.interpolation &&
               entry.interpolation.calc(entry.parent.value)
@@ -292,6 +344,8 @@ class Controller<P extends any = {}> {
           animatedValues.forEach(value => {
             value.startPosition = value.value
             value.lastPosition = value.value
+            // 这两步是在当前帧时，不会执行动画
+            // 而是在下一帧开始执行动画
             value.lastVelocity = isActive ? value.lastVelocity : undefined
             value.lastTime = isActive ? value.lastTime : undefined
             value.startTime = now()
@@ -309,12 +363,25 @@ class Controller<P extends any = {}> {
             [name]: {
               ...entry,
               name,
+
+              // parent 就是当前动画的 AnimatedValue
               parent,
+              // 当 isInterpolation 为 true 时，interpolation 是由 parent 进行插值进行计算的
+              // 否则 interpolation 就是 parent
               interpolation,
+
+              // 动画
               animatedValues,
+
+              // 当 useTrail 时，toValues 值为 AnimatedValue[]
+              // 在 FrameLoop 中会根据该值进行一些列逻辑
               toValues,
+              // 目标值
               previous: newValue,
               config: toConfig,
+
+              // from 传过去，和 to 结合判断方向。
+              // 非 Spring 动画也需要该值
               fromValues: toArray(parent.getValue()),
               immediate: callProp(immediate, name),
               initialVelocity: withDefault(toConfig.velocity, 0),

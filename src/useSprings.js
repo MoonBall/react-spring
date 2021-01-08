@@ -2,6 +2,10 @@ import { useMemo, useRef, useImperativeHandle, useEffect } from 'react'
 import Ctrl from './animated/Controller'
 import { callProp, is } from './shared/helpers'
 
+// ref 以 props 中第一个元素的 ref 为准。
+// 如果 props 是函数，那么函数定义是 (i, controller) => ({ ... })，更新的时候函数定义也是这个
+// 这个 Hook 没有一个 State... 所以产生动画时不会触发当前组件的更新
+
 /** API
  * const props = useSprings(number, [{ ... }, { ... }, ...])
  * const [props, set] = useSprings(number, (i, controller) => ({ ... }))
@@ -45,6 +49,9 @@ export const useSprings = (length, props) => {
     },
   }))
 
+  // updateCtrl 的参数
+  // 1. 如果是 isFn，这里的实参就应该是函数，其类型为：(i, controller) => ({ ... })
+  // 2. 如果不是 isFn，则实参就是属性
   // This function updates the controllers
   const updateCtrl = useMemo(
     () => updateProps =>
@@ -58,7 +65,10 @@ export const useSprings = (length, props) => {
   // Update controller if props aren't functional
   useEffect(() => {
     if (mounted.current) {
+      // 从第二次 render 才触发，第一次生成 controller 时已经触发 updateCtrl 了
       if (!isFn) updateCtrl(props)
+      // 下面 c.start() 可以删掉
+      // 因为第一次没有 ref 时，生成 controller 后已经执行 start 了
     } else if (!ref) ctrl.current.forEach(c => c.start())
   })
 
@@ -71,6 +81,7 @@ export const useSprings = (length, props) => {
   )
 
   // Return animated props, or, anim-props + the update-setter above
+  // 返回值为 [当前值 AnimatedInterpolation, 更新 controller 函数, 暂停函数]
   const propValues = ctrl.current.map(c => c.getValues())
   return isFn
     ? [

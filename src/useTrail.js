@@ -19,6 +19,7 @@ export const useTrail = (length, props) => {
     return {
       ...updateProps,
       config: callProp(updateProps.config, i),
+      // 这里有 attach 了
       attach: i > 0 && (() => instances.current[i - 1]),
     }
   })

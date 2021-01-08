@@ -18,6 +18,9 @@ export default class AnimatedProps<
           style: Globals.createAnimatedStyle(props.style),
         }
     this.update = callback
+
+    // AnimationProps 的 payload 中有 AnimationStyle
+    // AnimationStyle 中 children 是该 AnimationProps
     this.attach()
   }
 }

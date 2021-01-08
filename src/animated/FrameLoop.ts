@@ -8,9 +8,11 @@ const controllers = new Set()
 const update = () => {
   if (!active) return false
   let time = now()
+  // 遍历注册的所有 controller
   for (let controller of controllers) {
     let isActive = false
 
+    // 遍历 controller.configs
     for (
       let configIdx = 0;
       configIdx < controller.configs.length;
@@ -18,6 +20,8 @@ const update = () => {
     ) {
       let config = controller.configs[configIdx]
       let endOfAnimation, lastTime
+
+      // 遍历 config 中的动画，是获取的 animatedValues[valIdx]
       for (let valIdx = 0; valIdx < config.animatedValues.length; valIdx++) {
         let animation = config.animatedValues[valIdx]
 
@@ -73,6 +77,7 @@ const update = () => {
           // If we lost a lot of frames just jump to the end.
           if (time > lastTime + 64) lastTime = time
           // http://gafferongames.com/game-physics/fix-your-timestep/
+          // 这里好暴力啊，居然轮询了毫秒级别的次数
           let numSteps = Math.floor(time - lastTime)
           for (let i = 0; i < numSteps; ++i) {
             let force = -config.tension * (position - to)

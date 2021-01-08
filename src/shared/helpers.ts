@@ -120,8 +120,14 @@ interface InterpolateTo<T> extends PartialExcludedProps {
 export function interpolateTo<T extends PartialExcludedProps>(
   props: T
 ): InterpolateTo<T> {
+  // 不能识别的 key 组成了 forward
   const forward: ForwardedProps<T> = getForwardProps(props)
+  // HINT: 这里应该是不需要的，forward 不可能是 undefined
   if (is.und(forward)) return { to: forward, ...props }
+
+  // 遍历 props 的 key
+  // 收集 forward[key] 是 undefined 的 props[key]
+  // HINT: 这里如果 props.a = undefined，则返回的 forward 和 rest 中都包含 a
   const rest = Object.keys(props).reduce<PartialExcludedProps>(
     (a: PartialExcludedProps, k: string) =>
       !is.und((forward as any)[k]) ? a : { ...a, [k]: (props as any)[k] },

@@ -39,6 +39,14 @@ function addAnimatedStyles(
   }
 }
 
+/**
+ * AnimatedValue.children
+ *  - AnimatedInterpolation
+ *    - AnimatedStyle
+ *      - AnimatedProps ("c back")
+ *  - AnimatedStyle
+ *    - AnimatedProps ("c front")
+ */
 export default class AnimatedValue extends Animated implements SpringValue {
   private animatedStyles = new Set<AnimatedProps>()
 
@@ -58,6 +66,7 @@ export default class AnimatedValue extends Animated implements SpringValue {
   }
 
   private flush() {
+    // 懒赋值，当需要 flush 时才会去遍历，同时在动画重置时会清空该字段
     if (this.animatedStyles.size === 0) {
       addAnimatedStyles(this, this.animatedStyles)
     }
